@@ -26,8 +26,10 @@ void sgemmLab4Reg(int M, int N, int K, float alpha,
     // Total number of threads per block is defined as (BM * BN)/(TM * TN).
     // Each thread computes a microtile of size TM x TN.
     // threadRow and threadCol index which microtile this thread computes within the block tile.
-    const int threadRow = threadIdx.y;
-    const int threadCol = threadIdx.x;
+    // const int threadCol = threadIdx.x;
+    // const int threadRow = threadIdx.y;
+    const int threadCol = threadIdx.x % (BN / TN);
+    const int threadRow = threadIdx.x / (BN / TN);
 
     // Allocate shared memory for A_tile and B_tile.
     // A_tile: dimensions BM x BK, stored in row-major order.
@@ -48,20 +50,20 @@ void sgemmLab4Reg(int M, int N, int K, float alpha,
     // We use simple strides: each thread loads (and later computes) its microtile.
     // The number of microtiles per block along a dimension is BM/TM or BN/TN.
     // const int threadsPerRow = BM / TM; // same as BN / TN by assumption
-    // const int blockSizeM = BM / TM; // should be == blockDim.y;
-    // const int blockSizeN = BN / TN; 
-    const int blockSizeM = blockDim.y;
-    const int blockSizeN = blockDim.x;
+    const int blockSizeM = BM / TM; // should be == blockDim.y;
+    const int blockSizeN = BN / TN; 
+    // const int blockSizeM = blockDim.y;
+    // const int blockSizeN = blockDim.x;
 
     // Outer loop over the depth dimension of the multiplication.
     for (int bk = 0; bk < K; bk += BK) {
         // --- Load A tile into shared memory ---
         // Each thread loads multiple elements from A into sA.
         // Here we loop over rows in the tile with stride equal to number of threads in a column.
-        for (int i = threadIdx.y; i < BM; i += blockSizeM) {
+        for (int i = threadRow; i < BM; i += blockSizeM) {
             // int g_row = blockIdx.y*BM + i;
             int g_row = i;
-            for (int k = threadIdx.x; k < BK; k += blockSizeN) {
+            for (int k = threadCol; k < BK; k += blockSizeN) {
                 // int g_col = bk + k;
                 int g_col = k;
                 if (g_col < K && g_row < M) {
@@ -73,10 +75,10 @@ void sgemmLab4Reg(int M, int N, int K, float alpha,
         }
 
         // --- Load B tile into shared memory ---
-        for (int k = threadIdx.y; k < BK; k += blockSizeM) {
+        for (int k = threadRow; k < BK; k += blockSizeM) {
             // int g_row = bk + k;
             int g_row = k;
-            for (int j = threadIdx.x; j < BN; j += blockSizeN) {
+            for (int j = threadCol; j < BN; j += blockSizeN) {
                 // int g_col = blockIdx.x*BN + j;
                 int g_col = j;
                 if (g_row < K && g_col < N) {

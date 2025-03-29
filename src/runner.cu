@@ -223,8 +223,8 @@ void runSgemmLab4Reg(int M, int N, int K, float alpha, float *A, float *B,
         const uint BM = 128; // 160
         const uint BN = 128;
         dim3 gridDim(CEIL_DIV(N, BN), CEIL_DIV(M, BM));
-        // dim3 blockDim((BM * BN) / (TM * TN));
-        dim3 blockDim((BN /TN), (BM / TM));
+        dim3 blockDim((BM * BN) / (TM * TN));
+        // dim3 blockDim((BN /TN), (BM / TM));
         sgemmLab4Reg<BM, BN, BK, TM, TN>
             <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
     } else {
@@ -233,8 +233,8 @@ void runSgemmLab4Reg(int M, int N, int K, float alpha, float *A, float *B,
         const uint BM = 64;
         const uint BN = 64;
         dim3 gridDim(CEIL_DIV(N, BN), CEIL_DIV(M, BM));
-        // dim3 blockDim((BM * BN) / (TM * TN));
-        dim3 blockDim((BN /TN), (BM / TM));
+        dim3 blockDim((BM * BN) / (TM * TN));
+        // dim3 blockDim((BN /TN), (BM / TM));
         sgemmLab4Reg<BM, BN, BK, TM, TN>
             <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
     }
