@@ -34,8 +34,8 @@ void sgemmLab4Reg(int M, int N, int K, float alpha,
     // Allocate shared memory for A_tile and B_tile.
     // A_tile: dimensions BM x BK, stored in row-major order.
     // B_tile: dimensions BK x BN, stored in row-major order.
-    __shared__ float sA[BM * BK];
-    __shared__ float sB[BK * BN];
+    __shared__ float As[BM * BK];
+    __shared__ float Bs[BK * BN];
 
     // Adjust pointers to point to the beginning of this block's tile.
     A += blockRow * BM * K;
@@ -55,39 +55,66 @@ void sgemmLab4Reg(int M, int N, int K, float alpha,
     // const int blockSizeM = blockDim.y;
     // const int blockSizeN = blockDim.x;
 
+    // These variables are for their loop codes!
+    const uint totalResultsBlocktile = BM * BN;
+    // A thread is responsible for calculating TM*TN elements in the blocktile
+    const uint numThreadsBlocktile = totalResultsBlocktile / (TM * TN);
+
+    // ResultsPerBlock / ResultsPerThread == ThreadsPerBlock
+    assert(numThreadsBlocktile == blockDim.x);
+    // calculating the indices that this thread will load into SMEM
+    const uint innerRowA = threadIdx.x / BK;
+    const uint innerColA = threadIdx.x % BK;
+    // calculates the number of rows of As that are being loaded in a single step
+    // by a single block
+    const uint strideA = numThreadsBlocktile / BK;
+
+    const uint innerRowB = threadIdx.x / BN;
+    const uint innerColB = threadIdx.x % BN;
+    // for both As and Bs we want each load to span the full column-width, for
+    // better GMEM coalescing (as opposed to spanning full row-width and iterating
+    // across columns)
+    const uint strideB = numThreadsBlocktile / BN;
+
+
     // Outer loop over the depth dimension of the multiplication.
     for (int bk = 0; bk < K; bk += BK) {
         // --- Load A tile into shared memory ---
-        // Each thread loads multiple elements from A into sA.
+        for (uint loadOffset = 0; loadOffset < BM; loadOffset += strideA) {
+            As[(innerRowA + loadOffset) * BK + innerColA] =
+            A[(innerRowA + loadOffset) * K + innerColA];
+        }
+        for (uint loadOffset = 0; loadOffset < BK; loadOffset += strideB) {
+            Bs[(innerRowB + loadOffset) * BN + innerColB] =
+            B[(innerRowB + loadOffset) * N + innerColB];
+        }
+        
+        // Each thread loads multiple elements from A into As.
         // Here we loop over rows in the tile with stride equal to number of threads in a column.
-        for (int i = threadRow; i < BM; i += blockSizeM) {
-            // int g_row = blockIdx.y*BM + i;
-            int g_row = i;
-            for (int k = threadCol; k < BK; k += blockSizeN) {
-                // int g_col = bk + k;
-                int g_col = k;
-                if (g_col < K && g_row < M) {
-                    sA[i * BK + k] = A[g_row * K + g_col];
-                } else {
-                    sA[i * BK + k] = 0.0f;
-                }
-            }
-        }
+        // for (int i = threadRow; i < BM; i += blockSizeM) {
+        //     int g_row = i;
+        //     for (int k = threadCol; k < BK; k += blockSizeN) {
+        //         int g_col = k;
+        //         if (g_col < K && g_row < M) {
+        //             As[i * BK + k] = A[g_row * K + g_col];
+        //         } else {
+        //             As[i * BK + k] = 0.0f;
+        //         }
+        //     }
+        // }
 
-        // --- Load B tile into shared memory ---
-        for (int k = threadRow; k < BK; k += blockSizeM) {
-            // int g_row = bk + k;
-            int g_row = k;
-            for (int j = threadCol; j < BN; j += blockSizeN) {
-                // int g_col = blockIdx.x*BN + j;
-                int g_col = j;
-                if (g_row < K && g_col < N) {
-                    sB[k * BN + j] = B[g_row * N + g_col];
-                } else {
-                    sB[k * BN + j] = 0.0f;
-                }
-            }
-        }
+        // // --- Load B tile into shared memory ---
+        // for (int k = threadRow; k < BK; k += blockSizeM) {
+        //     int g_row = k;
+        //     for (int j = threadCol; j < BN; j += blockSizeN) {
+        //         int g_col = j;
+        //         if (g_row < K && g_col < N) {
+        //             Bs[k * BN + j] = B[g_row * N + g_col];
+        //         } else {
+        //             Bs[k * BN + j] = 0.0f;
+        //         }
+        //     }
+        // }
         __syncthreads();
 
         // --- Compute microtile multiplication ---
@@ -98,13 +125,13 @@ void sgemmLab4Reg(int M, int N, int K, float alpha,
             for (int i = 0; i < TM; ++i) {
                 int row = threadRow * TM + i;
                 int col = r_t;
-                regA[i] = sA[row * BK + col];
+                regA[i] = As[row * BK + col];
             }
             // Load a row of B tile into registers.
             for (int j = 0; j < TN; ++j) {
                 int row = r_t;
                 int col = threadCol * TN + j;
-                regB[j] = sB[row * BN + col];
+                regB[j] = Bs[row * BN + col];
             }
             // Multiply and accumulate.
             for (int i = 0; i < TM; ++i) {
