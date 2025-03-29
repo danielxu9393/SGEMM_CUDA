@@ -59,62 +59,46 @@ void sgemmLab4Reg(int M, int N, int K, float alpha,
     const uint totalResultsBlocktile = BM * BN;
     // A thread is responsible for calculating TM*TN elements in the blocktile
     const uint numThreadsBlocktile = totalResultsBlocktile / (TM * TN);
-
-    // ResultsPerBlock / ResultsPerThread == ThreadsPerBlock
+    // const uint numThreadsBlocktile = blockDim.x;
     assert(numThreadsBlocktile == blockDim.x);
-    // calculating the indices that this thread will load into SMEM
+    
     const uint innerRowA = threadIdx.x / BK;
     const uint innerColA = threadIdx.x % BK;
-    // calculates the number of rows of As that are being loaded in a single step
-    // by a single block
     const uint strideA = numThreadsBlocktile / BK;
 
     const uint innerRowB = threadIdx.x / BN;
     const uint innerColB = threadIdx.x % BN;
-    // for both As and Bs we want each load to span the full column-width, for
-    // better GMEM coalescing (as opposed to spanning full row-width and iterating
-    // across columns)
     const uint strideB = numThreadsBlocktile / BN;
 
 
     // Outer loop over the depth dimension of the multiplication.
     for (int bk = 0; bk < K; bk += BK) {
         // --- Load A tile into shared memory ---
-        for (uint loadOffset = 0; loadOffset < BM; loadOffset += strideA) {
-            As[(innerRowA + loadOffset) * BK + innerColA] =
-            A[(innerRowA + loadOffset) * K + innerColA];
-        }
-        for (uint loadOffset = 0; loadOffset < BK; loadOffset += strideB) {
-            Bs[(innerRowB + loadOffset) * BN + innerColB] =
-            B[(innerRowB + loadOffset) * N + innerColB];
-        }
+        // for (uint loadOffset = 0; loadOffset < BM; loadOffset += strideA) {
+        //     As[(innerRowA + loadOffset) * BK + innerColA] =
+        //     A[(innerRowA + loadOffset) * K + innerColA];
+        // }
+        // for (uint loadOffset = 0; loadOffset < BK; loadOffset += strideB) {
+        //     Bs[(innerRowB + loadOffset) * BN + innerColB] =
+        //     B[(innerRowB + loadOffset) * N + innerColB];
+        // }
         
-        // Each thread loads multiple elements from A into As.
-        // Here we loop over rows in the tile with stride equal to number of threads in a column.
-        // for (int i = threadRow; i < BM; i += blockSizeM) {
-        //     int g_row = i;
-        //     for (int k = threadCol; k < BK; k += blockSizeN) {
-        //         int g_col = k;
-        //         if (g_col < K && g_row < M) {
-        //             As[i * BK + k] = A[g_row * K + g_col];
-        //         } else {
-        //             As[i * BK + k] = 0.0f;
-        //         }
-        //     }
-        // }
+        // Load A
+        const uint tid = threadIdx.x;
+        const uint total_chunks_A = BM * BK;
+        for (uint chunk = tid; chunk < total_chunks_A; chunk += numThreadsBlocktile) {
+            uint row = chunk / BK;
+            uint col = chunk % BK;
+            As[row * BK + col] = A[row * K + col];
+        }
 
-        // // --- Load B tile into shared memory ---
-        // for (int k = threadRow; k < BK; k += blockSizeM) {
-        //     int g_row = k;
-        //     for (int j = threadCol; j < BN; j += blockSizeN) {
-        //         int g_col = j;
-        //         if (g_row < K && g_col < N) {
-        //             Bs[k * BN + j] = B[g_row * N + g_col];
-        //         } else {
-        //             Bs[k * BN + j] = 0.0f;
-        //         }
-        //     }
-        // }
+        const uint total_chunks_B = BK * BN;
+        for (uint chunk = tid; chunk < total_chunks_B; chunk += numThreadsBlocktile) {
+            uint row = chunk / BN;
+            uint col = chunk % BN;
+            Bs[row * BN + col] = B[row * N + col];
+        }
+
         __syncthreads();
 
         // --- Compute microtile multiplication ---
