@@ -1,3 +1,4 @@
+// Identical to original lab4 code
 #pragma once
 
 #include <algorithm>
@@ -17,7 +18,7 @@
 // TN: microtile (per thread) width (number of columns computed per thread)
 template <const int BM, const int BN, const int BK, const int TM, const int TN>
 __global__ __launch_bounds__((BM * BN) / (TM * TN), 1)
-void sgemmLab4Reg(int M, int N, int K, float alpha,
+void sgemmLab4RegOriginal(int M, int N, int K, float alpha,
                   const float *A, const float *B, float beta, float *C) {
     // Determine block tile indices (each block computes a BM x BN tile of C)
     const int blockRow = blockIdx.y;
@@ -26,10 +27,8 @@ void sgemmLab4Reg(int M, int N, int K, float alpha,
     // Total number of threads per block is defined as (BM * BN)/(TM * TN).
     // Each thread computes a microtile of size TM x TN.
     // threadRow and threadCol index which microtile this thread computes within the block tile.
-    // const int threadCol = threadIdx.x;
-    // const int threadRow = threadIdx.y;
-    const int threadCol = threadIdx.x % (BN / TN);
-    const int threadRow = threadIdx.x / (BN / TN);
+    const int threadCol = threadIdx.x;
+    const int threadRow = threadIdx.y;
 
     // Allocate shared memory for A_tile and B_tile.
     // A_tile: dimensions BM x BK, stored in row-major order.
@@ -38,9 +37,9 @@ void sgemmLab4Reg(int M, int N, int K, float alpha,
     __shared__ float Bs[BK * BN];
 
     // Adjust pointers to point to the beginning of this block's tile.
-    A += blockRow * BM * K;
-    B += blockCol * BN;
-    C += blockRow * BM * N + blockCol * BN;
+    // A += blockRow * BM * K;
+    // B += blockCol * BN;
+    // C += blockRow * BM * N + blockCol * BN;
 
     // Allocate registers to accumulate the per-thread microtile results.
     float threadResult[TM * TN] = {0.0f};
@@ -50,53 +49,39 @@ void sgemmLab4Reg(int M, int N, int K, float alpha,
     // We use simple strides: each thread loads (and later computes) its microtile.
     // The number of microtiles per block along a dimension is BM/TM or BN/TN.
     // const int threadsPerRow = BM / TM; // same as BN / TN by assumption
-    const int blockSizeM = BM / TM; // should be == blockDim.y;
-    const int blockSizeN = BN / TN; 
-    // const int blockSizeM = blockDim.y;
-    // const int blockSizeN = blockDim.x;
-
-    // These variables are for their loop codes!
-    const uint totalResultsBlocktile = BM * BN;
-    // A thread is responsible for calculating TM*TN elements in the blocktile
-    const uint numThreadsBlocktile = totalResultsBlocktile / (TM * TN);
-    // const uint numThreadsBlocktile = blockDim.x;
-    assert(numThreadsBlocktile == blockDim.x);
-    
-    const uint innerRowA = threadIdx.x / BK;
-    const uint innerColA = threadIdx.x % BK;
-    const uint strideA = numThreadsBlocktile / BK;
-
-    const uint innerRowB = threadIdx.x / BN;
-    const uint innerColB = threadIdx.x % BN;
-    const uint strideB = numThreadsBlocktile / BN;
-
+    const int blockSizeM = blockDim.y;
+    const int blockSizeN = blockDim.x;
 
     // Outer loop over the depth dimension of the multiplication.
     for (int bk = 0; bk < K; bk += BK) {
         // --- Load A tile into shared memory ---
-        // for (uint loadOffset = 0; loadOffset < BM; loadOffset += strideA) {
-        //     As[(innerRowA + loadOffset) * BK + innerColA] =
-        //     A[(innerRowA + loadOffset) * K + innerColA];
-        // }
-        // for (uint loadOffset = 0; loadOffset < BK; loadOffset += strideB) {
-        //     Bs[(innerRowB + loadOffset) * BN + innerColB] =
-        //     B[(innerRowB + loadOffset) * N + innerColB];
-        // }
-        
-        // Load A
-        const uint tid = threadIdx.x;
-        const uint total_chunks_A = BM * BK;
-        for (uint chunk = tid; chunk < total_chunks_A; chunk += numThreadsBlocktile) {
-            uint row = chunk / BK;
-            uint col = chunk % BK;
-            As[row * BK + col] = A[row * K + col];
+        for (int i = threadIdx.y; i < BM; i += blockSizeM) {
+            int g_row = blockIdx.y*BM + i;
+            // int g_row = i;
+            for (int k = threadIdx.x; k < BK; k += blockSizeN) {
+                int g_col = bk + k;
+                // int g_col = k;
+                if (g_col < K && g_row < M) {
+                    As[i * BK + k] = A[g_row * K + g_col];
+                } else {
+                    As[i * BK + k] = 0.0f;
+                }
+            }
         }
 
-        const uint total_chunks_B = BK * BN;
-        for (uint chunk = tid; chunk < total_chunks_B; chunk += numThreadsBlocktile) {
-            uint row = chunk / BN;
-            uint col = chunk % BN;
-            Bs[row * BN + col] = B[row * N + col];
+        // --- Load B tile into shared memory ---
+        for (int k = threadIdx.y; k < BK; k += blockSizeM) {
+            int g_row = bk + k;
+            // int g_row = k;
+            for (int j = threadIdx.x; j < BN; j += blockSizeN) {
+                int g_col = blockIdx.x*BN + j;
+                // int g_col = j;
+                if (g_row < K && g_col < N) {
+                    Bs[k * BN + j] = B[g_row * N + g_col];
+                } else {
+                    Bs[k * BN + j] = 0.0f;
+                }
+            }
         }
 
         __syncthreads();
@@ -127,17 +112,17 @@ void sgemmLab4Reg(int M, int N, int K, float alpha,
         __syncthreads();
 
         // Advance A and B pointers to the next block tile in the depth dimension.
-        A += BK;
-        B += BK * N;
+        // A += BK;
+        // B += BK * N;
     }
 
     // Write the final results to global memory with alpha and beta scaling.
     for (int i = 0; i < TM; ++i) {
-        // int globalRow = blockRow * BM + threadRow * TM + i;
-        int globalRow = threadRow * TM + i;
+        int globalRow = blockRow * BM + threadRow * TM + i;
+        // int globalRow = threadRow * TM + i;
         for (int j = 0; j < TN; ++j) {
-            // int globalCol = blockCol * BN + threadCol * TN + j;
-            int globalCol = threadCol * TN + j;
+            int globalCol = blockCol * BN + threadCol * TN + j;
+            // int globalCol = threadCol * TN + j;
             // if (globalRow + blockRow * BM < M && globalCol + blockCol * BN < N) {
             int idx = globalRow * N + globalCol;
             C[idx] = alpha * threadResult[i * TN + j] + beta * C[idx];
