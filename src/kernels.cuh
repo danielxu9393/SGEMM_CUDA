@@ -17,3 +17,5 @@
 #include "kernels/1013_kernel_lab4_reg.cuh"
 #include "kernels/1014_kernel_lab4_reg.cuh"
 #include "kernels/1015_kernel_lab4_reg.cuh"
+#include "kernels/1016_kernel_lab4_reg.cuh"
+#include "kernels/1017_kernel_lab4_reg.cuh"

@@ -1,6 +1,8 @@
 {
     "files.associations": {
-        "cstdlib": "cpp"
+        "Makefile.*": "makefile",
+        "cstdlib": "cpp",
+        "iomanip": "cpp"
     },
     "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools"
 }

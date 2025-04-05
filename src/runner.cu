@@ -214,131 +214,6 @@ void runSgemm2DBlocktiling(int M, int N, int K, float alpha, float *A, float *B,
   }
 }
 
-void runSgemmLab4Reg1DTid(int M, int N, int K, float alpha, float *A, float *B,
-    float beta, float *C) {
-    const uint BK = 8; // 16
-    const uint TM = 8; // 10
-    const uint TN = 8;
-    if (M >= 128 and N >= 128) {
-        const uint BM = 128; // 160
-        const uint BN = 128;
-        dim3 gridDim(CEIL_DIV(N, BN), CEIL_DIV(M, BM));
-        dim3 blockDim((BM * BN) / (TM * TN));
-        // dim3 blockDim((BN /TN), (BM / TM));
-        sgemmLab4Reg1DTid<BM, BN, BK, TM, TN>
-            <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
-    } else {
-        // this is a hacky solution to the underlying problem
-        // of not having proper bounds checking in the kernel
-        const uint BM = 64;
-        const uint BN = 64;
-        dim3 gridDim(CEIL_DIV(N, BN), CEIL_DIV(M, BM));
-        dim3 blockDim((BM * BN) / (TM * TN));
-        // dim3 blockDim((BN /TN), (BM / TM));
-        sgemmLab4Reg1DTid<BM, BN, BK, TM, TN>
-            <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
-    }
-}
-
-void runSgemmLab4RegTileAsyncLoop(int M, int N, int K, float alpha, float *A, float *B,
-    float beta, float *C) {
-    const uint BK = 8; // 16
-    const uint TM = 8; // 10
-    const uint TN = 8;
-    if (M >= 128 and N >= 128) {
-        const uint BM = 128; // 160
-        const uint BN = 128;
-        dim3 gridDim(CEIL_DIV(N, BN), CEIL_DIV(M, BM));
-        dim3 blockDim((BM * BN) / (TM * TN));
-        // dim3 blockDim((BN /TN), (BM / TM));
-        sgemmLab4RegTileAsyncLoop<BM, BN, BK, TM, TN>
-            <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
-    } else {
-        // this is a hacky solution to the underlying problem
-        // of not having proper bounds checking in the kernel
-        const uint BM = 64;
-        const uint BN = 64;
-        dim3 gridDim(CEIL_DIV(N, BN), CEIL_DIV(M, BM));
-        dim3 blockDim((BM * BN) / (TM * TN));
-        // dim3 blockDim((BN /TN), (BM / TM));
-        sgemmLab4RegTileAsyncLoop<BM, BN, BK, TM, TN>
-            <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
-    }
-}
-
-void runSgemmLab4RegKernel5Loop(int M, int N, int K, float alpha, float *A, float *B,
-    float beta, float *C) {
-    const uint BK = 8; // 16
-    const uint TM = 8; // 10
-    const uint TN = 8;
-    if (M >= 128 and N >= 128) {
-        const uint BM = 128; // 160
-        const uint BN = 128;
-        dim3 gridDim(CEIL_DIV(N, BN), CEIL_DIV(M, BM));
-        dim3 blockDim((BM * BN) / (TM * TN));
-        // dim3 blockDim((BN /TN), (BM / TM));
-        sgemmLab4RegKernel5Loop<BM, BN, BK, TM, TN>
-            <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
-    } else {
-        // this is a hacky solution to the underlying problem
-        // of not having proper bounds checking in the kernel
-        const uint BM = 64;
-        const uint BN = 64;
-        dim3 gridDim(CEIL_DIV(N, BN), CEIL_DIV(M, BM));
-        dim3 blockDim((BM * BN) / (TM * TN));
-        // dim3 blockDim((BN /TN), (BM / TM));
-        sgemmLab4RegKernel5Loop<BM, BN, BK, TM, TN>
-            <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
-    }
-}
-
-void runSgemmLab4RegOriginal(int M, int N, int K, float alpha, float *A, float *B,
-    float beta, float *C) {
-    const uint BK = 8; // 16
-    const uint TM = 8; // 10
-    const uint TN = 8;
-    if (M >= 128 and N >= 128) {
-        const uint BM = 128; // 160
-        const uint BN = 128;
-        dim3 gridDim(CEIL_DIV(N, BN), CEIL_DIV(M, BM));
-        dim3 blockDim((BN /TN), (BM / TM));
-        sgemmLab4RegOriginal<BM, BN, BK, TM, TN>
-            <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
-    } else {
-        // this is a hacky solution to the underlying problem
-        // of not having proper bounds checking in the kernel
-        const uint BM = 64;
-        const uint BN = 64;
-        dim3 gridDim(CEIL_DIV(N, BN), CEIL_DIV(M, BM));
-        dim3 blockDim((BN /TN), (BM / TM));
-        sgemmLab4RegOriginal<BM, BN, BK, TM, TN>
-            <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
-    }
-}
-void runSgemmLab4RegPointerIncrement(int M, int N, int K, float alpha, float *A, float *B,
-    float beta, float *C) {
-    const uint BK = 8; // 16
-    const uint TM = 8; // 10
-    const uint TN = 8;
-    if (M >= 128 and N >= 128) {
-        const uint BM = 128; // 160
-        const uint BN = 128;
-        dim3 gridDim(CEIL_DIV(N, BN), CEIL_DIV(M, BM));
-        dim3 blockDim((BN /TN), (BM / TM));
-        sgemmLab4RegPointerIncrement<BM, BN, BK, TM, TN>
-            <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
-    } else {
-        // this is a hacky solution to the underlying problem
-        // of not having proper bounds checking in the kernel
-        const uint BM = 64;
-        const uint BN = 64;
-        dim3 gridDim(CEIL_DIV(N, BN), CEIL_DIV(M, BM));
-        dim3 blockDim((BN /TN), (BM / TM));
-        sgemmLab4RegPointerIncrement<BM, BN, BK, TM, TN>
-            <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
-    }
-}
-
 void runSgemmVectorize(int M, int N, int K, float alpha, float *A, float *B,
                        float beta, float *C) {
   const uint BK = 8;
@@ -647,7 +522,7 @@ void run_kernel(int kernel_num, int M, int N, int K, float alpha, float *A,
   case 5:
     runSgemm2DBlocktiling(M, N, K, alpha, A, B, beta, C);
     break;
-  case 1011:
+    case 1011:
     runSgemmLab4RegOriginal(M, N, K, alpha, A, B, beta, C);
     break;
   case 1012:
@@ -661,6 +536,12 @@ void run_kernel(int kernel_num, int M, int N, int K, float alpha, float *A,
     break;
   case 1015:
     runSgemmLab4RegKernel5Loop(M, N, K, alpha, A, B, beta, C);
+    break;
+  case 1016:
+    runSgemmLab4RegVectorize(M, N, K, alpha, A, B, beta, C);
+    break;
+  case 1017:
+    runSgemmLab4RegVectorizeTransposeA(M, N, K, alpha, A, B, beta, C);
     break;
   case 6:
     runSgemmVectorize(M, N, K, alpha, A, B, beta, C);

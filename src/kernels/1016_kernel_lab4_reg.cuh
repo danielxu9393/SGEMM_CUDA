@@ -49,7 +49,7 @@ void sgemmLab4RegVectorize(int M, int N, int K, float alpha,
     // We use simple strides: each thread loads (and later computes) its microtile.
     // The number of microtiles per block along a dimension is BM/TM or BN/TN.
     // const int threadsPerRow = BM / TM; // same as BN / TN by assumption
-    const int blockSizeM = BM / TM; // should be == blockDim.y;
+    const int blockSizeM = BM / TM;
     const int blockSizeN = BN / TN; 
 
     // float4 (LDS.128) is 4 floats wide
@@ -65,29 +65,34 @@ void sgemmLab4RegVectorize(int M, int N, int K, float alpha,
     // Multiply everything by primitiveWidth since we load 4 at a time
     // Assumption: We need dimensions of As, Bs to be multiples of 4!!!
     const uint innerRowA = primitiveWidth * threadIdx.x / BK;
-    const uint innerColA = primitiveWidth * threadIdx.x % BK;
+    const uint innerColA = (primitiveWidth * threadIdx.x) % BK;
     const uint strideA = primitiveWidth * numThreadsBlocktile / BK;
 
     const uint innerRowB = primitiveWidth * threadIdx.x / BN;
-    const uint innerColB = primitiveWidth * threadIdx.x % BN;
+    const uint innerColB = (primitiveWidth * threadIdx.x) % BN;
     const uint strideB = primitiveWidth * numThreadsBlocktile / BN;
 
 
     // Outer loop over the depth dimension of the multiplication.
     for (int bk = 0; bk < K; bk += BK) {
         // --- Load A tile into shared memory ---
+        // Load BM x BK
+        // Each instruction, all threads collectively load strideA rows size BK
         for (uint loadOffset = 0; loadOffset < BM; loadOffset += strideA) {
             // As[(innerRowA + loadOffset) * BK + innerColA] =
             // A[(innerRowA + loadOffset) * K + innerColA];
             // TODO: The loop doesn't work since loadOffset is in the slowest dimension
             *reinterpret_cast<float4*>(&As[(innerRowA + loadOffset) * BK + innerColA]) =
-                *reinterpret_cast<float4*>(&A[(innerRowA + loadOffset) * K + innerColA]);
+                *reinterpret_cast<const float4*>(&A[(innerRowA + loadOffset) * K + innerColA]);
         }
+        // --- Load B tile into shared memory ---
+        // Load BK x BN
+        // Each instruction, all threads collectively load strideB rows size BN
         for (uint loadOffset = 0; loadOffset < BK; loadOffset += strideB) {
             // Bs[(innerRowB + loadOffset) * BN + innerColB] =
             // B[(innerRowB + loadOffset) * N + innerColB];
             *reinterpret_cast<float4*>(&Bs[(innerRowB + loadOffset) * BN + innerColB]) =
-                *reinterpret_cast<float4*>(&B[(innerRowB + loadOffset) * N + innerColB]);
+                *reinterpret_cast<const float4*>(&B[(innerRowB + loadOffset) * N + innerColB]);
         }
 
         __syncthreads();
@@ -123,15 +128,61 @@ void sgemmLab4RegVectorize(int M, int N, int K, float alpha,
     }
 
     // Write the final results to global memory with alpha and beta scaling.
+    // We assume TN is multiple of 4, and shape of C are multiples of 4!!
     for (int i = 0; i < TM; ++i) {
         // int globalRow = blockRow * BM + threadRow * TM + i;
         int globalRow = threadRow * TM + i;
-        for (int j = 0; j < TN; ++j) {
+        for (int j = 0; j < TN; j+=4) {
             // int globalCol = blockCol * BN + threadCol * TN + j;
             int globalCol = threadCol * TN + j;
             // if (globalRow + blockRow * BM < M && globalCol + blockCol * BN < N) {
             int idx = globalRow * N + globalCol;
-            C[idx] = alpha * threadResult[i * TN + j] + beta * C[idx];
+            // C[idx] = alpha * threadResult[i * TN + j] + beta * C[idx];
+            float4 a_val = *reinterpret_cast<float4*>(&threadResult[i * TN + j]);
+            float4 b_val = *reinterpret_cast<float4*>(&C[idx]);
+            float4 tmp;
+            tmp.x = alpha * a_val.x + beta * b_val.x;
+            tmp.y = alpha * a_val.y + beta * b_val.y;
+            tmp.z = alpha * a_val.z + beta * b_val.z;
+            tmp.w = alpha * a_val.w + beta * b_val.w;
+
+            // Their write code is slower than mine!!!
+            // 16.3GFlops on 4096 with their code, but 16.6GFlops on 4096 with mine!!
+
+            // float4 tmp = reinterpret_cast<float4 *>(
+            //     &C[idx])[0];
+            // // perform GEMM update in reg
+            // tmp.x = alpha * threadResult[i * TN + j] + beta * tmp.x;
+            // tmp.y = alpha * threadResult[i * TN + j + 1] + beta * tmp.y;
+            // tmp.z = alpha * threadResult[i * TN + j + 2] + beta * tmp.z;
+            // tmp.w = alpha * threadResult[i * TN + j + 3] + beta * tmp.w;
+            *reinterpret_cast<float4*>(&C[idx]) = tmp;
         }
+    }
+}
+
+void runSgemmLab4RegVectorize(int M, int N, int K, float alpha, float *A, float *B,
+    float beta, float *C) {
+    const uint BK = 8; // 16
+    const uint TM = 8; // 10
+    const uint TN = 8;
+    if (M >= 128 and N >= 128) {
+        const uint BM = 128; // 160
+        const uint BN = 128;
+        dim3 gridDim(CEIL_DIV(N, BN), CEIL_DIV(M, BM));
+        dim3 blockDim((BM * BN) / (TM * TN));
+        // dim3 blockDim((BN /TN), (BM / TM));
+        sgemmLab4RegVectorize<BM, BN, BK, TM, TN>
+            <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
+    } else {
+        // this is a hacky solution to the underlying problem
+        // of not having proper bounds checking in the kernel
+        const uint BM = 64;
+        const uint BN = 64;
+        dim3 gridDim(CEIL_DIV(N, BN), CEIL_DIV(M, BM));
+        dim3 blockDim((BM * BN) / (TM * TN));
+        // dim3 blockDim((BN /TN), (BM / TM));
+        sgemmLab4RegVectorize<BM, BN, BK, TM, TN>
+            <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
     }
 }

@@ -51,7 +51,7 @@ void sgemmLab4RegKernel5Loop(int M, int N, int K, float alpha,
     // We use simple strides: each thread loads (and later computes) its microtile.
     // The number of microtiles per block along a dimension is BM/TM or BN/TN.
     // const int threadsPerRow = BM / TM; // same as BN / TN by assumption
-    const int blockSizeM = BM / TM; // should be == blockDim.y;
+    const int blockSizeM = BM / TM;
     const int blockSizeN = BN / TN; 
     // const int blockSizeM = blockDim.y;
     // const int blockSizeN = blockDim.x;
@@ -75,10 +75,12 @@ void sgemmLab4RegKernel5Loop(int M, int N, int K, float alpha,
     // Outer loop over the depth dimension of the multiplication.
     for (int bk = 0; bk < K; bk += BK) {
         // --- Load A tile into shared memory ---
+        // Each step, all threads collectively load strideA rows size BK
         for (uint loadOffset = 0; loadOffset < BM; loadOffset += strideA) {
             As[(innerRowA + loadOffset) * BK + innerColA] =
             A[(innerRowA + loadOffset) * K + innerColA];
         }
+        // Each step, all threads collectively load strideB rows size BN
         for (uint loadOffset = 0; loadOffset < BK; loadOffset += strideB) {
             Bs[(innerRowB + loadOffset) * BN + innerColB] =
             B[(innerRowB + loadOffset) * N + innerColB];
@@ -127,5 +129,31 @@ void sgemmLab4RegKernel5Loop(int M, int N, int K, float alpha,
             int idx = globalRow * N + globalCol;
             C[idx] = alpha * threadResult[i * TN + j] + beta * C[idx];
         }
+    }
+}
+
+void runSgemmLab4RegKernel5Loop(int M, int N, int K, float alpha, float *A, float *B,
+    float beta, float *C) {
+    const uint BK = 8; // 16
+    const uint TM = 8; // 10
+    const uint TN = 8;
+    if (M >= 128 and N >= 128) {
+        const uint BM = 128; // 160
+        const uint BN = 128;
+        dim3 gridDim(CEIL_DIV(N, BN), CEIL_DIV(M, BM));
+        dim3 blockDim((BM * BN) / (TM * TN));
+        // dim3 blockDim((BN /TN), (BM / TM));
+        sgemmLab4RegKernel5Loop<BM, BN, BK, TM, TN>
+            <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
+    } else {
+        // this is a hacky solution to the underlying problem
+        // of not having proper bounds checking in the kernel
+        const uint BM = 64;
+        const uint BN = 64;
+        dim3 gridDim(CEIL_DIV(N, BN), CEIL_DIV(M, BM));
+        dim3 blockDim((BM * BN) / (TM * TN));
+        // dim3 blockDim((BN /TN), (BM / TM));
+        sgemmLab4RegKernel5Loop<BM, BN, BK, TM, TN>
+            <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
     }
 }
