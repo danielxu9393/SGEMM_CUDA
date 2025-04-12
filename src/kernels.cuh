@@ -24,3 +24,4 @@
 #include "kernels/1111_kernel_lab4_reg.cuh"
 #include "kernels/1112_kernel_lab4_reg.cuh"
 #include "kernels/1113_kernel_lab4_reg.cuh"
+#include "kernels/1114_kernel_lab4_reg.cuh"

@@ -50,8 +50,8 @@ void sgemmLab4RegWarpTiling(int M, int N, int K, float alpha,
     const int warpRow = warpIdx / DN;
 
     const int threadIdxInWarp = threadIdx.x % 32;
-    const int threadCol = threadIdxInWarp % NWN;
-    const int threadRow = threadIdxInWarp / NWN;
+    const int threadColInWarp = threadIdxInWarp % NWN;
+    const int threadRowInWarp = threadIdxInWarp / NWN;
 
     // Allocate shared memory for A_tile and B_tile.
     // A_tile: dimensions BM x BK, stored in row-major order.
@@ -125,7 +125,7 @@ void sgemmLab4RegWarpTiling(int M, int N, int K, float alpha,
             // Load a column of A tile into registers for this microtile.
             for (int i = 0; i < WMITER; i += 1) {
                 for (int k = 0; k < TM; k += primitiveWidth) {
-                    int col = warpRow * warpOwnSizeM + i*warpBlockSizeM + threadRow * TM + k;
+                    int col = warpRow * warpOwnSizeM + i*warpBlockSizeM + threadRowInWarp * TM + k;
                     int row = r_t;                // current row in the shared tile
                     *reinterpret_cast<float4*>(&regA[k + i*TM]) =
                         *reinterpret_cast<const float4*>(&As[row * BM + col]);
@@ -135,7 +135,7 @@ void sgemmLab4RegWarpTiling(int M, int N, int K, float alpha,
             for (int j = 0; j < WNITER; j += 1) {
                 for (int k = 0; k < TN; k += primitiveWidth) {
                     int row = r_t;                // current row in the shared tile
-                    int col = warpCol * warpOwnSizeN + j*warpBlockSizeN + threadCol * TN + k;   // starting column in the shared tile
+                    int col = warpCol * warpOwnSizeN + j*warpBlockSizeN + threadColInWarp * TN + k;   // starting column in the shared tile
                     *reinterpret_cast<float4*>(&regB[k + j*TN]) =
                         *reinterpret_cast<const float4*>(&Bs[row * BN + col]);
                 }
@@ -162,8 +162,8 @@ void sgemmLab4RegWarpTiling(int M, int N, int K, float alpha,
         for (int warpBlockIdxN = 0; warpBlockIdxN < WNITER; warpBlockIdxN++){
             for (int i = 0; i < TM; i += 1) {
                 for (int j = 0; j < TN; j += primitiveWidth){
-                    int globalRow = warpRow * warpOwnSizeM + warpBlockIdxM*warpBlockSizeM + threadRow * TM + i;
-                    int globalCol = warpCol * warpOwnSizeN + warpBlockIdxN*warpBlockSizeN + threadCol * TN + j;
+                    int globalRow = warpRow * warpOwnSizeM + warpBlockIdxM*warpBlockSizeM + threadRowInWarp * TM + i;
+                    int globalCol = warpCol * warpOwnSizeN + warpBlockIdxN*warpBlockSizeN + threadColInWarp * TN + j;
                     int regRow = warpBlockIdxM * TM + i;
                     int regCol = warpBlockIdxN * TN + j;
                     int idx = globalRow * N + globalCol;

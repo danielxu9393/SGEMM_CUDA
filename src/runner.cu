@@ -573,6 +573,9 @@ void run_kernel(int kernel_num, int M, int N, int K, float alpha, float *A,
   case 1113:
     runSgemmLab4RegWarpTilingMatch(M, N, K, alpha, A, B, beta, C);
     break;
+  case 1114:
+    runSgemmWarpTilingBackwards(M, N, K, alpha, A, B, beta, C);
+    break;
   case 11:
     runSgemmDoubleBuffering(M, N, K, alpha, A, B, beta, C);
     break;
