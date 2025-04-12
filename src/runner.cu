@@ -543,6 +543,12 @@ void run_kernel(int kernel_num, int M, int N, int K, float alpha, float *A,
   case 1017:
     runSgemmLab4RegVectorizeTransposeA(M, N, K, alpha, A, B, beta, C);
     break;
+  case 1018:
+    runSgemmLab4RegVectorize2DTid(M, N, K, alpha, A, B, beta, C);
+    break;
+  case 1019:
+    runSgemmLab4RegVectorizeSharedToReg(M, N, K, alpha, A, B, beta, C);
+    break;
   case 6:
     runSgemmVectorize(M, N, K, alpha, A, B, beta, C);
     break;
@@ -557,6 +563,15 @@ void run_kernel(int kernel_num, int M, int N, int K, float alpha, float *A,
     break;
   case 10:
     runSgemmWarptiling(M, N, K, alpha, A, B, beta, C);
+    break;
+  case 1111:
+    runSgemmLab4RegSplitTiling(M, N, K, alpha, A, B, beta, C);
+    break;
+  case 1112:
+    runSgemmLab4RegWarpTiling(M, N, K, alpha, A, B, beta, C);
+    break;
+  case 1113:
+    runSgemmLab4RegWarpTilingMatch(M, N, K, alpha, A, B, beta, C);
     break;
   case 11:
     runSgemmDoubleBuffering(M, N, K, alpha, A, B, beta, C);
