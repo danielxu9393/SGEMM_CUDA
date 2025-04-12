@@ -1,4 +1,5 @@
 // From kernel 1017, not warptiling, but split 8x8 into 4x4s for better bank conflicting
+// 19.5TFlops
 #pragma once
 
 #include <algorithm>
@@ -29,12 +30,12 @@ void sgemmLab4RegSplitTiling(int M, int N, int K, float alpha,
     // 2
     // const int NTM = BM / (TM * DM); // Number of microtiles in the M direction per thread
     // const int NTN = BN / (TN * DN); // Number of microtiles in the N direction per thread
-    const int DM = BM / (TM * NTM); // Number of threads in the M direction per block
-    const int DN = BN / (TN * NTN); // Number of threads in the N direction per block
+    constexpr int DM = BM / (TM * NTM); // Number of threads in the M direction per block
+    constexpr int DN = BN / (TN * NTN); // Number of threads in the N direction per block
 
     // 64
-    const int STM = TM * DM; // Stride between microtiles owned by each thread in the M direction
-    const int STN = TN * DN; // Stride between microtiles owned by each thread in the N direction
+    constexpr int STM = TM * DM; // Stride between microtiles owned by each thread in the M direction
+    constexpr int STN = TN * DN; // Stride between microtiles owned by each thread in the N direction
 
     // DM x DN grid of threads each owning NTM x NTN grid of TMxTN microtiles
     // Strided at STM x STN.
@@ -64,23 +65,23 @@ void sgemmLab4RegSplitTiling(int M, int N, int K, float alpha,
 
 
     // float4 (LDS.128) is 4 floats wide
-    const uint primitiveWidth = 4;
+    constexpr uint primitiveWidth = 4;
 
     // These variables are for their loop codes!
-    const uint totalResultsBlocktile = BM * BN;
-    const uint numThreadsBlocktile = DM*DN;
-    assert(numThreadsBlocktile == blockDim.x);
+    constexpr uint totalResultsBlocktile = BM * BN;
+    constexpr uint numThreadsBlocktile = DM*DN;
+    // assert(numThreadsBlocktile == blockDim.x);
     
     // Multiply everything by primitiveWidth since we load 4 at a time
     // Assumption: We need dimensions of As, Bs to be multiples of 4!!!
     // This code is all the same as 1017
     const uint innerRowA = primitiveWidth * threadIdx.x / BK;
     const uint innerColA = (primitiveWidth * threadIdx.x) % BK;
-    const uint strideA = primitiveWidth * numThreadsBlocktile / BK;
+    constexpr uint strideA = primitiveWidth * numThreadsBlocktile / BK;
 
     const uint innerRowB = primitiveWidth * threadIdx.x / BN;
     const uint innerColB = (primitiveWidth * threadIdx.x) % BN;
-    const uint strideB = primitiveWidth * numThreadsBlocktile / BN;
+    constexpr uint strideB = primitiveWidth * numThreadsBlocktile / BN;
 
 
     // Outer loop over the depth dimension of the multiplication.
@@ -128,6 +129,23 @@ void sgemmLab4RegSplitTiling(int M, int N, int K, float alpha,
                 *reinterpret_cast<float4*>(&regB[j*primitiveWidth]) =
                     *reinterpret_cast<const float4*>(&Bs[row * BN + col]);
             }
+
+            // Unvectorizing here doesn't help:
+            // for (uint wSubRowIdx = 0; wSubRowIdx < NTM; ++wSubRowIdx) {
+            //     for (uint i = 0; i < TM; ++i) {
+            //       regA[wSubRowIdx * TM + i] =
+            //           As[(r_t * BM) + wSubRowIdx * STM +
+            //              threadRow * TM + i];
+            //     }
+            //   }
+            //   for (uint wSubColIdx = 0; wSubColIdx < STN; ++wSubColIdx) {
+            //     for (uint i = 0; i < TN; ++i) {
+            //       regB[wSubColIdx * TN + i] =
+            //           Bs[(r_t * BN) + wSubColIdx * STN +
+            //              threadCol * TN + i];
+            //     }
+            //   }
+
             // Multiply and accumulate.
             // We don't need to worry about any strides or anything
             for (int i = 0; i < TM*NTM; ++i) {

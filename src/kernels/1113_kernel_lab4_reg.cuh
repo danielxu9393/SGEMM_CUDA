@@ -4,6 +4,8 @@
 // constexpr is very important!!! On warpBlockSizeMN, strideAB
 // Their loops for smem -> registers, fma are important to go together!!
 // 2.
+// Their loading code seems to be way better???
+// And their fma is like a tiny bit better...
 // My load + My fma: 20.8TFlops
 // My load + their fma: 20.8TFlops
 // Their load + my fma: 21.2TFlops
