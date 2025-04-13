@@ -1,5 +1,5 @@
 // From kernel 1017, not warptiling, but split 8x8 into 4x4s for better bank conflicting
-// 19.5TFlops
+// 20TFlops
 #pragma once
 
 #include <algorithm>
@@ -23,7 +23,7 @@
 // NTN: number of microtiles in the N direction per thread
 // Note: Currently, this code assumes TM=TN=primitiveWidth lol, the loops aren't smart enough because I got lazy...
 template <const int BM, const int BN, const int BK, const int TM, const int TN, const int NTM, const int NTN>
-__global__ __launch_bounds__((BM * BN) / (TM * NTM * TN * NTN), 1)
+__global__ __launch_bounds__((BM * BN) / (TM * NTM * TN * NTN))
 void sgemmLab4RegSplitTiling(int M, int N, int K, float alpha,
                   const float *A, const float *B, float beta, float *C) {
 
@@ -188,7 +188,7 @@ void sgemmLab4RegSplitTiling(int M, int N, int K, float alpha,
 
 void runSgemmLab4RegSplitTiling(int M, int N, int K, float alpha, float *A, float *B,
     float beta, float *C) {
-    const uint BK = 8; // 16
+    const uint BK = 16; // 16
     const uint TM = 4; // 10
     const uint TN = 4;
     const uint NTM = 2;

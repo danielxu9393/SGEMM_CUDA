@@ -582,6 +582,12 @@ void run_kernel(int kernel_num, int M, int N, int K, float alpha, float *A,
   case 12:
     runSgemmDoubleBuffering2(M, N, K, alpha, A, B, beta, C);
     break;
+  case 1211:
+    runSgemmLab5AsyncLoad(M, N, K, alpha, A, B, beta, C);
+    break;
+  case 1212:
+    runSgemmLab5DoubleBuffering(M, N, K, alpha, A, B, beta, C);
+    break;
   default:
     throw std::invalid_argument("Unknown kernel number");
   }
