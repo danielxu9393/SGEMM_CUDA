@@ -27,3 +27,4 @@
 #include "kernels/1114_kernel_lab4_reg.cuh"
 #include "kernels/1211_kernel_lab5_async.cuh"
 #include "kernels/1212_kernel_lab5_async.cuh"
+#include "kernels/1311_kernel_lab6_tensor.cuh"

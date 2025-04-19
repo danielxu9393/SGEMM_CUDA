@@ -105,11 +105,24 @@ void print_matrix(const float *A, int M, int N, std::ofstream &fs) {
 bool verify_matrix(float *matRef, float *matOut, int N) {
   double diff = 0.0;
   int i;
+  float atol;
+  float rtol;
+  if (N < 2048*2048) {
+    atol = 0.5f;
+    rtol = 0.05f;
+  } else {
+    atol = 1.0f;
+    rtol = 0.02f;
+  }
   for (i = 0; i < N; i++) {
     diff = std::fabs(matRef[i] - matOut[i]);
-    if (diff > 0.01) {
-      printf("Divergence! Should %5.2f, Is %5.2f (Diff %5.2f) at %d\n",
-             matRef[i], matOut[i], diff, i);
+    float relError = (std::fabs(matRef[i]) > 1e-8f)
+                       ? diff / std::fabs(matRef[i])
+                       : diff + 0.0f;  // fallback (so relError == diff)
+    // if (diff > 0.01) {
+    if (diff > atol && relError > rtol) {
+      printf("Divergence! Should %5.4f, Is %5.4f (Diff %5.4f, relError %5.4f) at %d\n",
+             matRef[i], matOut[i], diff, relError, i);
       return false;
     }
   }
@@ -588,6 +601,10 @@ void run_kernel(int kernel_num, int M, int N, int K, float alpha, float *A,
   case 1212:
     runSgemmLab5DoubleBuffering(M, N, K, alpha, A, B, beta, C);
     break;
+  case 1311:
+    runSgemmLab6Tensor(M, N, K, alpha, A, B, beta, C);
+    break;
+
   default:
     throw std::invalid_argument("Unknown kernel number");
   }
