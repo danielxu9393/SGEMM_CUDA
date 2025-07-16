@@ -1,3 +1,4 @@
+// Optimized loop index increments to be more warp sensitive
 #pragma once
 
 #include <algorithm>

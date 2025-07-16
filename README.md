@@ -1,13 +1,32 @@
 # Daniel Xu's implementations:
+This repo is a fork of (https://github.com/siboehm/SGEMM_CUDA)[https://github.com/siboehm/SGEMM_CUDA] where I have implemented my own kernels to get better intuition on GPU performance. My kernel 1211 with async global loading performs 1.6% better then the best original implementation.
+
+My kernels for GFLOPs at matrix size 4096x4096:
 <!-- benchmark_results -->
 | Kernel                              |  GFLOPs/s | Performance relative to cuBLAS |
 |:------------------------------------|----------:|:-------------------------------|
-| 1211:                       | `21.2 TFlops` | 95.6%                          |
-| 0: cuBLAS                           | `23.2 Tflops` | 100.0%                         |
+|1011: My first draft with tiling |`5079.9`| 21.8% |
+|1012: A,B,C pointer increment in loop |`5117.3`| 22.0% |
+|1013: Collapse block dim to 1D |`8145.0`| 35.0% |
+|1014: Made inner loops have each warp load consecutive floats |`12374.3`| 53.2% |
+|1015: Copied the inner loops from kernel 5 (cleaner indexing) |`15756.8`| 67.8% |
+|1016: Vectorized memory access |`16639.9`| 71.6% |
+|1017: Tranpose A so shared -> registers load is coalesced |`18594.3`| 80.0% |
+|1018: Tried back to 2D block dim (slower) |`18210.2`| 78.3% |
+|1019: Start from 1017, try vectorizing loading shared -> registers|`18522.1`| 79.7% |
+|1111: Split tiling |`20163.5`| 86.7% |
+|1112: My warptiling implementation |`20777.4`| 89.4% |
+|1113: Debugging why their warptiling better |`21659.8`| 93.2% |
+|1114: Debugging why their warptiling better 2 |`21900.5`|94.2% |
+|1211: Async Global Loading | `22135.9` | 95.2%   |
+|1212: Double Buffering (slower) |`16270.0`|70.0% |
+|1311: Added Tensor Cores first draft |`31001.8` | NA | 
+| 0: cuBLAS (No Tensor Cores)   | `23249.6` | 100.0%   |
 <!-- benchmark_results -->
 
 
 
+# Original README
 
 # Fast CUDA SGEMM from Scratch
 
