@@ -1,5 +1,5 @@
 # Daniel Xu's implementations:
-This repo is a fork of (https://github.com/siboehm/SGEMM_CUDA)[https://github.com/siboehm/SGEMM_CUDA] where I have implemented my own kernels to get better intuition on GPU performance. My kernel 1211 with async global loading performs 1.6% better then the best original implementation.
+This repo is a fork of https://github.com/siboehm/SGEMM_CUDA where I have implemented my own kernels to get better intuition on GPU performance. My kernel 1211 with async global loading performs 1.6% better then the best original implementation.
 
 I also implemented a version with tensor cores. (Didn't spend much time on this yet)
 
