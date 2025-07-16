@@ -1,3 +1,14 @@
+# Daniel Xu's implementations:
+<!-- benchmark_results -->
+| Kernel                              |  GFLOPs/s | Performance relative to cuBLAS |
+|:------------------------------------|----------:|:-------------------------------|
+| 1211:                       | `21.2 TFlops` | 95.6%                          |
+| 0: cuBLAS                           | `23.2 Tflops` | 100.0%                         |
+<!-- benchmark_results -->
+
+
+
+
 # Fast CUDA SGEMM from Scratch
 
 Step-by-step optimization of matrix multiplication, implemented in CUDA.
