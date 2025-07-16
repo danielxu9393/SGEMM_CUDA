@@ -217,14 +217,14 @@ void sgemmLab6Tensor(int M, int N, int K, float alpha,
 
 void runSgemmLab6Tensor(int M, int N, int K, float alpha, float *A, float *B,
     float beta, float *C) {
-    const uint BK = 16; // multiple of 8
-    const uint WMITER = 4;
-    const uint WNITER = 4;
+    const uint BK = 64;
+    const uint WMITER = 8;
+    const uint WNITER = 8;
     const uint TM = 16;
     const uint TN = 8;
     const uint TK = 8;
-    const uint BM = 128; // 160
-    const uint BN = 128;
+    const uint BM = 256;
+    const uint BN = 256;
     dim3 gridDim(CEIL_DIV(N, BN), CEIL_DIV(M, BM));
     dim3 blockDim(32 * (BM * BN) / (TM * WMITER * TN * WNITER));
     sgemmLab6Tensor<BM, BN, BK, TM, TN, TK, WMITER, WNITER>
