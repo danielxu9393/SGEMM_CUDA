@@ -517,6 +517,9 @@ void runSgemmDoubleBuffering2(int M, int N, int K, float alpha, float *A,
 void run_kernel(int kernel_num, int M, int N, int K, float alpha, float *A,
                 float *B, float beta, float *C, cublasHandle_t handle) {
   switch (kernel_num) {
+  case -1:
+    runCublasTF32(handle, M, N, K, alpha, A, B, beta, C);
+    break;
   case 0:
     runCublasFP32(handle, M, N, K, alpha, A, B, beta, C);
     break;

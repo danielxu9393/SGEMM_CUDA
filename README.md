@@ -1,7 +1,9 @@
 # Daniel Xu's implementations:
 This repo is a fork of (https://github.com/siboehm/SGEMM_CUDA)[https://github.com/siboehm/SGEMM_CUDA] where I have implemented my own kernels to get better intuition on GPU performance. My kernel 1211 with async global loading performs 1.6% better then the best original implementation.
 
-My kernels for GFLOPs at matrix size 4096x4096:
+I also implemented a version with tensor cores. (Didn't spend much time on this yet)
+
+My kernels for GFLOPs at matrix size 4096x4096 no Tensor Cores:
 <!-- benchmark_results -->
 | Kernel                              |  GFLOPs/s | Performance relative to cuBLAS |
 |:------------------------------------|----------:|:-------------------------------|
@@ -20,10 +22,27 @@ My kernels for GFLOPs at matrix size 4096x4096:
 |1114: Debugging why their warptiling better 2 |`21900.5`|94.2% |
 |1211: Async Global Loading | `22135.9` | 95.2%   |
 |1212: Double Buffering (slower) |`16270.0`|70.0% |
-|1311: Added Tensor Cores first draft |`31001.8` | NA | 
 | 0: cuBLAS (No Tensor Cores)   | `23249.6` | 100.0%   |
 <!-- benchmark_results -->
 
+My kernels for GFLOPs at matrix size 4096x4096 with Tensor Cores:
+<!-- benchmark_results -->
+| Kernel                              |  GFLOPs/s | Performance relative to cuBLAS |
+|:------------------------------------|----------:|:-------------------------------|
+|1311: Added Tensor Cores first draft |`31001.8` | 53.8% | 
+|-1: cuBLAS (With Tensor Cores)   | `57634.7` | 100.0%   |
+<!-- benchmark_results -->
+
+
+(For CuBLAS with tensor core, use kernel -1)
+
+Build: `mkdir build && cd build && cmake .. && cmake --build .`
+
+Rebuild: `cmake .. && cmake --build .`
+
+Clean: `cmake --build . --target clean`
+
+Run: `DEVICE=5 ./sgemm 1311`
 
 
 # Original README
